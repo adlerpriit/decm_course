@@ -11,8 +11,8 @@ ln -s "$workspace_dir/.codex-home" "$HOME/.codex"
 
 # update and install required system packages
 sudo apt update
-sudo apt upgrade -y
-sudo apt install -y docker.io python3-pip python3-venv
+
+sudo apt install -y docker.io docker-compose make curl openssl python3-pip python3-venv
 
 # create and populate python environment
 python3 -m venv "$workspace_dir/.venv"

@@ -1,124 +1,259 @@
-#
-# Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
-# this work for additional information regarding copyright ownership.
-# The ASF licenses this file to You under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+# Combined local stack for course use.
+# Profiles:
+# - superset
+# - airflow
 
-# -----------------------------------------------------------------------
-# We don't support docker compose for production environments.
-# If you choose to use this type of deployment make sure to
-# create you own docker environment file (docker/.env) with your own
-# unique random secure passwords and SECRET_KEY.
-# -----------------------------------------------------------------------
-# This file is modified copy from https://github.com/apache/superset/blob/master/docker-compose-image-tag.yml
-# with fixed tag and reduced dependencies, created for teaching purposes
-x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:6.0.0
-x-superset-volumes:
-  &superset-volumes # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
-  - superset_home:/app/superset_home
+x-superset-image: &superset-image ${SUPERSET_IMAGE}
+x-superset-volumes: &superset-volumes
+  - superset-home:/app/superset_home
+
+x-airflow-common: &airflow-common
+  image: ${AIRFLOW_IMAGE_NAME}
+  env_file:
+    - .env
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${AIRFLOW_DB_NAME}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: ${AIRFLOW_DAGS_PAUSED_AT_CREATION}
+    AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_LOAD_EXAMPLES}
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW_CONFIG: /opt/airflow/config/airflow.cfg
+    _PIP_ADDITIONAL_REQUIREMENTS: ""
+  volumes:
+    - type: bind
+      source: ${HOST_WORKSPACE}/airflow/dags
+      target: /opt/airflow/dags
+      bind:
+        create_host_path: true
+    - airflow-logs:/opt/airflow/logs
+    - airflow-config:/opt/airflow/config
+    - airflow-plugins:/opt/airflow/plugins
+  user: "${AIRFLOW_UID}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
 
 services:
-  redis:
-    image: redis:7
-    container_name: superset_cache
-    restart: unless-stopped
+  postgres:
+    profiles:
+      - superset
+      - airflow
+    image: ${POSTGRES_IMAGE}
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_ADMIN_DB}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
     volumes:
-      - redis:/data
-
-  db:
-    env_file:
-      - path: .env # default
-        required: true
-    image: postgres:17
-    container_name: superset_db
-    restart: unless-stopped
-    volumes:
-      - db_home:/var/lib/postgresql/data
-
-  superset:
-    env_file:
-      - path: .env # default
-        required: true
-    image: *superset-image
-    container_name: superset_app
-    command: ["/app/docker/docker-bootstrap.sh", "app-gunicorn"]
-    user: "root"
-    restart: unless-stopped
-    ports:
-      - 8088:8088
-    depends_on:
-      superset-init:
-        condition: service_completed_successfully
-    volumes: *superset-volumes
-
-  superset-init:
-    image: *superset-image
-    container_name: superset_init
-    command: ["/app/docker/docker-init.sh"]
-    env_file:
-      - path: .env # default
-        required: true
-    depends_on:
-      db:
-        condition: service_started
-      redis:
-        condition: service_started
-    user: "root"
-    volumes: *superset-volumes
-    healthcheck:
-      disable: true
-
-  superset-worker:
-    image: *superset-image
-    container_name: superset_worker
-    command: ["/app/docker/docker-bootstrap.sh", "worker"]
-    env_file:
-      - path: .env # default
-        required: true
-    restart: unless-stopped
-    depends_on:
-      superset-init:
-        condition: service_completed_successfully
-    user: "root"
-    volumes: *superset-volumes
+      - postgres-data:/var/lib/postgresql/data
+      - type: bind
+        source: ${HOST_WORKSPACE}/postgres/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME",
-        ]
-
-  superset-worker-beat:
-    image: *superset-image
-    container_name: superset_worker_beat
-    command: ["/app/docker/docker-bootstrap.sh", "beat"]
-    env_file:
-      - path: .env # default
-        required: true
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_ADMIN_USER} -d ${POSTGRES_ADMIN_DB}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
+
+  superset-redis:
+    profiles:
+      - superset
+    image: redis:7.2-bookworm
+    volumes:
+      - superset-redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  superset-init:
+    profiles:
+      - superset
+    image: *superset-image
+    env_file:
+      - .env
+    environment:
+      DATABASE_DIALECT: ${SUPERSET_DB_DIALECT}
+      DATABASE_HOST: ${POSTGRES_HOST}
+      DATABASE_PORT: ${POSTGRES_PORT}
+      DATABASE_DB: ${SUPERSET_DB_NAME}
+      DATABASE_USER: ${SUPERSET_DB_USER}
+      DATABASE_PASSWORD: ${SUPERSET_DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    command:
+      - /app/docker/docker-init.sh
     depends_on:
-      superset-init:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      superset-redis:
+        condition: service_healthy
     user: "root"
     volumes: *superset-volumes
     healthcheck:
       disable: true
 
+  superset:
+    profiles:
+      - superset
+    image: *superset-image
+    env_file:
+      - .env
+    environment:
+      DATABASE_DIALECT: ${SUPERSET_DB_DIALECT}
+      DATABASE_HOST: ${POSTGRES_HOST}
+      DATABASE_PORT: ${POSTGRES_PORT}
+      DATABASE_DB: ${SUPERSET_DB_NAME}
+      DATABASE_USER: ${SUPERSET_DB_USER}
+      DATABASE_PASSWORD: ${SUPERSET_DB_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    command:
+      - /app/docker/docker-bootstrap.sh
+      - app-gunicorn
+    ports:
+      - ${SUPERSET_PORT}:8088
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    volumes: *superset-volumes
+    user: "root"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://localhost:8088/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  airflow-init:
+    <<: *airflow-common
+    profiles:
+      - airflow
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID}:0" /opt/airflow/{logs,dags,plugins,config}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      _AIRFLOW_WWW_USER_FIRSTNAME: Airflow
+      _AIRFLOW_WWW_USER_LASTNAME: Admin
+      _AIRFLOW_WWW_USER_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
+      _PIP_ADDITIONAL_REQUIREMENTS: ""
+    user: "0:0"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    profiles:
+      - airflow
+    command: api-server
+    ports:
+      - ${AIRFLOW_PORT}:8080
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://localhost:8080/api/v2/version
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    profiles:
+      - airflow
+    command: scheduler
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://localhost:8974/health
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    profiles:
+      - airflow
+    command: dag-processor
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    profiles:
+      - airflow
+    command: triggerer
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
 volumes:
-  superset_home:
-    external: false
-  db_home:
-    external: false
-  redis:
-    external: false
+  superset-home:
+  superset-redis-data:
+  postgres-data:
+  airflow-logs:
+  airflow-config:
+  airflow-plugins:

@@ -2,6 +2,13 @@
 
 This repository is used for teaching. Code, configuration, and docs must optimize for student understanding, reproducibility, and low-friction setup in a VS Code + devcontainer workflow.
 
+## Execution Environment Notes
+
+- Work is primarily done from inside the devcontainer.
+- The devcontainer has `sudo` access and mounts the host Docker socket (`/var/run/docker.sock`).
+- Prefer containerized tooling and avoid host-level install assumptions beyond VS Code, Docker, and Git.
+- When documenting commands, assume they are run inside the devcontainer unless explicitly stated otherwise.
+
 ## ExecPlans
 
 When writing complex features or significant refactors, use an ExecPlan (as described in `PLANS.md`) from design to implementation.

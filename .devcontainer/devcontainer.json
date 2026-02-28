@@ -17,7 +17,8 @@
     ],
 
 	"containerEnv": {
-        "CODEX_HOME": "${containerWorkspaceFolder}/.codex-home"
+        "CODEX_HOME": "${containerWorkspaceFolder}/.codex-home",
+        "HOST_WORKSPACE": "${localWorkspaceFolder}"
     },
 
     // Uncomment the next line to run commands after the container is created.
