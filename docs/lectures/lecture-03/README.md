@@ -57,6 +57,13 @@ make up-superset
 - [Devcontainer Guide](./devcontainers.md)
 - [Troubleshooting](./troubleshooting.md)
 
+## Companion Repositories
+
+- Git conflict + pull request playground:
+  <https://github.com/ELIXIREstonia/2024-11-06-git-playground>
+- Devcontainer badge demo:
+  <https://github.com/adlerpriit/dev_test>
+
 ## Optional Deep-Dive
 
 If time allows:

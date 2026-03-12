@@ -1,5 +1,8 @@
 # Airflow + dbt Pipeline Notes
 
+For the student-facing lecture flow and learning outcomes, start with:
+- [Lecture 5 Overview](./README.md)
+
 This document describes the current Airflow + dbt orchestration setup.
 
 ## Current State

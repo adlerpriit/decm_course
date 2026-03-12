@@ -1,5 +1,8 @@
 # Airviro ETL Notes (Lecture 4 Starter)
 
+For the student-facing lecture flow and learning outcomes, start with:
+- [Lecture 4 Overview](./README.md)
+
 ## Overview
 
 This pipeline ingests:

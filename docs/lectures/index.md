@@ -7,6 +7,8 @@ This folder contains student-facing lecture/tutorial materials for the course.
 3. Lecture 3: VS Code, Docker, Git, and devcontainers fundamentals
    - [Lecture 3 Overview](./lecture-03/README.md)
 4. Lecture 4: Python ETL and Superset basics
-   - (to be added)
+   - [Lecture 4 Overview](./lecture-04/README.md)
+   - [Lecture 4 Operations Notes](./lecture-04/operations.md)
 5. Lecture 5: Airflow + dbt orchestration and pipeline evolution
-   - (to be added)
+   - [Lecture 5 Overview](./lecture-05/README.md)
+   - [Lecture 5 Operations Notes](./lecture-05/operations.md)

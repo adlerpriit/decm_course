@@ -8,6 +8,8 @@ It lets students share the same toolchain without installing most dependencies o
 Reference:
 
 - Dev Containers docs: <https://code.visualstudio.com/docs/devcontainers/create-dev-container>
+- Devcontainer badge example repository:
+  <https://github.com/adlerpriit/dev_test>
 
 ## Why We Use It in This Course
 
@@ -96,3 +98,8 @@ make up-superset
 
 5. Verify Superset opens at <http://localhost:8088>.
 
+## Optional Demo Repository
+
+For class demonstration of devcontainer badge behavior on GitHub, use:
+
+- <https://github.com/adlerpriit/dev_test>

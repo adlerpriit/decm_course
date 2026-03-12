@@ -17,6 +17,8 @@ Reference:
 
 - GitHub Flow: <https://docs.github.com/en/get-started/using-github/github-flow>
 - Dedicated troubleshooting for VS Code auth/account/config issues: [Git Troubleshooting](./git-troubleshooting.md)
+- Conflict + pull request practice repository:
+  <https://github.com/ELIXIREstonia/2024-11-06-git-playground>
 
 ## VS Code UI Workflow (Primary)
 
@@ -86,3 +88,5 @@ If merge conflicts appear in VS Code:
 1. Compare `merge` vs `rebase` conceptually.
 2. Try a small PR review using GitHub web UI.
 3. Review [Git Troubleshooting](./git-troubleshooting.md) and practice one failure recovery.
+4. Use the Git playground repository to practice branch conflicts and PR flow end-to-end:
+   <https://github.com/ELIXIREstonia/2024-11-06-git-playground>
