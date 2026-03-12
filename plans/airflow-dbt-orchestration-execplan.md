@@ -15,8 +15,8 @@ Students should be able to start Docker Compose, run one command or enable one D
 
 ## Student Learning Impact
 
-- Lecture 2 becomes clearer: ingestion and modeling are separated.
-- Lecture 3 becomes realistic: students see Airflow orchestration + dbt dependency graph + tests.
+- Lecture 4 becomes clearer: ingestion and modeling are separated.
+- Lecture 5 becomes realistic: students see Airflow orchestration + dbt dependency graph + tests.
 - Students learn two distinct backfill patterns:
   - scheduled incremental with automatic gap catch-up after downtime;
   - explicit historical backfill runs (2020 -> present).

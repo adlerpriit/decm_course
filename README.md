@@ -106,13 +106,13 @@ make logs SERVICE=postgres
 Student-facing lecture notes are in:
 
 - `docs/lectures/index.md`
-- Lecture 1 package: `docs/lectures/lecture-01/`
+- Lecture 3 package: `docs/lectures/lecture-03/`
 
 Instructor-only assessments workflow:
 
 - keep these materials in your separate private instructor repository (not in this repo)
 
-## ETL Starter (Lecture 2)
+## ETL Starter (Lecture 4)
 
 Ensure the shared stack is up
 
@@ -160,7 +160,7 @@ make etl-backfill-2020-today
 Detailed ETL notes and precipitation-source investigation:
 - `docs/etl-airviro.md`
 
-## dbt Starter (Lecture 3)
+## dbt Starter (Lecture 5)
 
 dbt runs inside `airflow-scheduler` (same runtime used later by Airflow DAG tasks).
 
@@ -180,7 +180,7 @@ make dbt-test
 dbt project files are in:
 - `dbt/`
 
-## Airflow DAG Starter (Lecture 3)
+## Airflow DAG Starter (Lecture 5)
 
 Two DAGs are provided:
 - `airviro_incremental`:

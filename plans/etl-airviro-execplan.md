@@ -12,8 +12,8 @@ The design should also prepare for the Airflow lecture (incremental updates + ba
 
 ## Student Learning Impact
 
-- Lecture 2: students run a real ETL pipeline with defensive extraction, validation, and loading.
-- Lecture 3: the same pipeline can be orchestrated in Airflow with backfill and idempotent reruns.
+- Lecture 4: students run a real ETL pipeline with defensive extraction, validation, and loading.
+- Lecture 5: the same pipeline can be orchestrated in Airflow with backfill and idempotent reruns.
 - Students learn practical batch-windowing strategy for unstable APIs.
 
 ## Scope
