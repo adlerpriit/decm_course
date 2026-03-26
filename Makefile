@@ -1,13 +1,36 @@
 SHELL := /bin/bash
 ENV_FILE := .env
-HOST_WORKSPACE ?= $(PWD)
+WORKSPACE_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+HOST_WORKSPACE ?= $(WORKSPACE_DIR)
 export HOST_WORKSPACE
+# Docker commands run inside the devcontainer against the host daemon through the
+# mounted socket, so bind mounts must use the daemon-visible workspace path.
+RESOLVE_HOST_WORKSPACE = \
+	path="$(HOST_WORKSPACE)"; \
+	inspected_path="$$(sudo docker inspect "$$(hostname)" --format '{{range .Mounts}}{{if eq .Destination "$(WORKSPACE_DIR)"}}{{println .Source}}{{end}}{{end}}' 2>/dev/null | head -n 1)"; \
+	if [ -n "$$inspected_path" ]; then \
+		path="$$inspected_path"; \
+	elif [ -z "$$path" ]; then \
+		echo "HOST_WORKSPACE is not set." >&2; \
+		exit 1; \
+	elif printf "%s" "$$path" | grep -Eq "^/.*[A-Za-z]:[\\\\/]"; then \
+		echo "HOST_WORKSPACE contains an invalid mixed path: $$path" >&2; \
+		exit 1; \
+	elif printf "%s" "$$path" | grep -Eq "^[A-Za-z]:[\\\\/]"; then \
+		drive="$$(printf "%s" "$$path" | cut -c1 | tr "[:upper:]" "[:lower:]")"; \
+		rest="$$(printf "%s" "$$path" | sed -E "s@^[A-Za-z]:[\\\\/]?@@; s@\\\\@/@g")"; \
+		path="/run/desktop/mnt/host/$$drive/$$rest"; \
+	elif ! printf "%s" "$$path" | grep -Eq '^/'; then \
+		echo "HOST_WORKSPACE must be an absolute path. Current value: $$path" >&2; \
+		exit 1; \
+	fi;
 # TODO(option-3): remove sudo once devcontainer user has direct Docker socket access.
-COMPOSE := sudo --preserve-env=HOST_WORKSPACE docker compose --env-file $(ENV_FILE)
+COMPOSE := $(RESOLVE_HOST_WORKSPACE) sudo env HOST_WORKSPACE="$$path" docker compose --env-file $(ENV_FILE)
 PROFILES_SUPERSET := --profile superset
 PROFILES_AIRFLOW := --profile airflow
 ETL_VERBOSE_FLAG := $(if $(filter 1 true yes,$(VERBOSE)),--verbose,)
 DBT_PROJECT_DIR := /opt/airflow/dbt
+LECTURE4_SOURCE_KEYS := --source-key air_quality_station_8 --source-key pollen_station_25
 DAG_ID ?= airviro_incremental
 BACKFILL_START ?= 2020-01-01
 BACKFILL_END ?=
@@ -17,7 +40,7 @@ BACKFILL_ADVANCE_WATERMARK ?= true
 STATUS_INDICATOR_LIMIT ?= 500
 STATUS_AUDIT_LIMIT ?= 10
 
-.PHONY: help init check-host-workspace up-superset up-airflow up-all down logs ps reset-volumes reset-all \
+.PHONY: help init check-host-workspace print-host-workspace up-superset up-airflow up-all down logs ps reset-volumes reset-all \
 	etl-bootstrap etl-dry-run etl-backfill-2020-2025 etl-backfill-2020-today warehouse-status warehouse-status-json \
 	devcontainer-join-course-network devcontainer-leave-course-network dbt-debug dbt-seed dbt-run dbt-test dbt-build \
 	airflow-list-dags airflow-list-runs airflow-trigger-incremental airflow-trigger-backfill \
@@ -31,14 +54,15 @@ help:
 	@echo "  make up-all         Start Superset + Airflow"
 	@echo "  make down           Stop/remove containers and detach devcontainer from course network if needed"
 	@echo "  make ps             Show container status"
+	@echo "  make print-host-workspace  Show the host path docker compose will use for bind mounts"
 	@echo "  make logs SERVICE=<name>  Follow logs for one service"
 	@echo "  make reset-volumes  Remove containers and named volumes"
 	@echo "  make reset-all      Remove containers, volumes, and local images"
-	@echo "  make etl-bootstrap  Create/update ETL warehouse schema objects"
+	@echo "  make etl-bootstrap  Ensure Lecture 4 advanced ETL warehouse schema objects exist"
 	@echo "  make etl-dry-run    Run ETL extraction + validation without database writes"
-	@echo "  make etl-backfill-2020-2025  Load Airviro data for 2020-2025"
-	@echo "  make etl-backfill-2020-today Load Airviro data from 2020-01-01 to today"
-	@echo "  make warehouse-status        Show warehouse health + completeness report"
+	@echo "  make etl-backfill-2020-2025  Load Lecture 4 Airviro data for station 8 + pollen 25"
+	@echo "  make etl-backfill-2020-today Load Lecture 4 Airviro data from 2020-01-01 to today"
+	@echo "  make warehouse-status        Show Lecture 4 warehouse health + completeness report"
 	@echo "  make warehouse-status-json   Same report in JSON format"
 	@echo "    Optional: STATUS_INDICATOR_LIMIT=500 STATUS_AUDIT_LIMIT=10"
 	@echo "    Optional: add VERBOSE=1 to ETL targets for progress logs"
@@ -72,7 +96,18 @@ init:
 	@mkdir -p airflow/dags
 
 check-host-workspace:
-	@if [ -z "$$HOST_WORKSPACE" ]; then echo "HOST_WORKSPACE is not set."; exit 1; fi
+	@$(RESOLVE_HOST_WORKSPACE) :
+
+print-host-workspace:
+	@$(RESOLVE_HOST_WORKSPACE) \
+	echo "Workspace path in devcontainer: $(WORKSPACE_DIR)"; \
+	echo "Requested HOST_WORKSPACE: $(HOST_WORKSPACE)"; \
+	if [ -n "$$inspected_path" ]; then \
+		echo "Detected host mount source via docker inspect: $$inspected_path"; \
+	else \
+		echo "Detected host mount source via docker inspect: unavailable"; \
+	fi; \
+	echo "Resolved HOST_WORKSPACE for docker compose: $$path"
 
 up-superset: init check-host-workspace
 	@$(COMPOSE) $(PROFILES_SUPERSET) up -d
@@ -106,13 +141,13 @@ etl-bootstrap: init
 	@.venv/bin/python -m etl.airviro.cli bootstrap-db
 
 etl-dry-run: init
-	@.venv/bin/python -m etl.airviro.cli run --from 2025-01-01 --to 2025-01-31 --dry-run $(ETL_VERBOSE_FLAG)
+	@.venv/bin/python -m etl.airviro.cli run --from 2026-03-10 --to 2026-03-12 $(LECTURE4_SOURCE_KEYS) --dry-run $(ETL_VERBOSE_FLAG)
 
 etl-backfill-2020-2025: init
-	@.venv/bin/python -m etl.airviro.cli run --from 2020-01-01 --to 2025-12-31 $(ETL_VERBOSE_FLAG)
+	@.venv/bin/python -m etl.airviro.cli run --from 2020-01-01 --to 2025-12-31 $(LECTURE4_SOURCE_KEYS) $(ETL_VERBOSE_FLAG)
 
 etl-backfill-2020-today: init
-	@.venv/bin/python -m etl.airviro.cli backfill --from 2020-01-01 $(ETL_VERBOSE_FLAG)
+	@.venv/bin/python -m etl.airviro.cli backfill --from 2020-01-01 $(LECTURE4_SOURCE_KEYS) $(ETL_VERBOSE_FLAG)
 
 warehouse-status: init
 	@.venv/bin/python -m etl.airviro.cli warehouse-status --indicator-limit $(STATUS_INDICATOR_LIMIT) --audit-limit $(STATUS_AUDIT_LIMIT)
