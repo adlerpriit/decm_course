@@ -146,6 +146,14 @@ def build_progress_logger(verbose: bool) -> ProgressCallback | None:
             )
             return
 
+        if event_name == "coverage_warning":
+            print(
+                f"[{source_label}] warning: {event['warning']}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return
+
         if event_name == "source_complete":
             print(
                 (
@@ -575,7 +583,7 @@ def run_pipeline(
                 duplicate_records=summary.duplicate_measurements,
                 split_events=summary.split_events,
                 status="success",
-                message=None,
+                message=" | ".join(summary.warnings)[:500] if summary.warnings else None,
             )
 
         if not dry_run:

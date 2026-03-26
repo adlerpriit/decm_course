@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, datetime, time as day_time, timedelta
 import csv
 import hashlib
 import io
@@ -60,6 +60,7 @@ class SourceRunSummary:
     measurements_upserted: int = 0
     duplicate_measurements: int = 0
     split_events: int = 0
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -413,7 +414,72 @@ def extract_window_with_split(
     records, rows_read, duplicates = parse_airviro_csv(source, csv_text)
     summary.rows_read += rows_read
     summary.duplicate_measurements += duplicates
+    coverage_warning = build_window_coverage_warning(
+        source=source,
+        window_start=window_start,
+        window_end=window_end,
+        records=records,
+    )
+    if coverage_warning is not None:
+        summary.warnings.append(coverage_warning)
+        if progress is not None:
+            progress(
+                {
+                    "event": "coverage_warning",
+                    "source_key": source.source_key,
+                    "source_type": source.source_type,
+                    "window_start": window_start.isoformat(),
+                    "window_end": window_end.isoformat(),
+                    "warning": coverage_warning,
+                }
+            )
     return records
+
+
+def build_window_coverage_warning(
+    *,
+    source: SourceConfig,
+    window_start: date,
+    window_end: date,
+    records: list[MeasurementRow],
+) -> str | None:
+    """Return a non-fatal warning when response timestamps do not reach window bounds."""
+
+    if not records:
+        return (
+            f"{source.source_key}: no timestamps returned for requested window "
+            f"{window_start.isoformat()}..{window_end.isoformat()}"
+        )
+
+    first_observed_at = min(record.observed_at for record in records)
+    last_observed_at = max(record.observed_at for record in records)
+
+    expected_start = datetime.combine(window_start, day_time.min)
+    if source.source_type == "pollen":
+        # Pollen observations are treated as daily for completeness reporting.
+        missing_start = first_observed_at.date() > window_start
+        missing_end = last_observed_at.date() < window_end
+    else:
+        expected_end = datetime.combine(window_end, day_time(hour=23))
+        missing_start = first_observed_at > expected_start
+        missing_end = last_observed_at < expected_end
+
+    if not missing_start and not missing_end:
+        return None
+
+    missing_parts: list[str] = []
+    if missing_start:
+        missing_parts.append("start")
+    if missing_end:
+        missing_parts.append("end")
+
+    return (
+        f"{source.source_key}: returned timestamps do not fully cover requested window "
+        f"{window_start.isoformat()}..{window_end.isoformat()} "
+        f"(missing {', '.join(missing_parts)}; "
+        f"first_observed_at={first_observed_at.isoformat(sep=' ', timespec='minutes')}, "
+        f"last_observed_at={last_observed_at.isoformat(sep=' ', timespec='minutes')})"
+    )
 
 
 def build_source_records(

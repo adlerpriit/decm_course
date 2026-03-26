@@ -116,6 +116,8 @@ make reset-volumes
 make reset-all
 ```
 
+These lifecycle targets detach the devcontainer from the course Compose network before teardown so Docker can remove the project network cleanly.
+
 ## Environment Notes
 
 - Work from inside the devcontainer.

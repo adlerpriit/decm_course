@@ -79,27 +79,6 @@ Dimensions:
 - `mart.dim_indicator`
 - `mart.dim_wind_direction`
 
-## Precipitation data options for Tartu
-
-### Recommended for course simplicity: Open-Meteo Archive API
-
-Pros:
-- free, no API key for non-commercial use,
-- straightforward hourly/daily precipitation fields,
-- easy to query by latitude/longitude for Tartu.
-
-Tartu coordinates example:
-- latitude `58.3776`
-- longitude `26.7290`
-
-### Alternative: Estonian Environment Portal (KAIA) open-data files
-
-Pros:
-- official Estonian open-data channel.
-
-Tradeoff:
-- file-oriented API (metadata + file download), more setup needed for consistent historical ETL compared with Open-Meteo.
-
 ## Source links
 
 - Airviro endpoint examples:
@@ -112,7 +91,3 @@ Tradeoff:
 - Estonian Environment Portal open-data API:
   - Overview: <https://www.ilmateenistus.ee/teenused/avaandmete-api/>
   - Swagger: <https://avaandmed.keskkonnaportaal.ee/swagger/index.html>
-- Design-pattern article:
-  - Publication URL: <https://aws.plainenglish.io/data-engineering-design-patterns-you-must-learn-in-2026-c25b7bd0b9a7>
-  - Friend-link variant used for full text review:
-    <https://medium.com/@khushbu.shah_661/data-engineering-design-patterns-you-must-learn-in-2026-c25b7bd0b9a7?sk=6e987862791060915725ed9618652cfd>

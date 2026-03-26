@@ -19,7 +19,7 @@ STATUS_AUDIT_LIMIT ?= 10
 
 .PHONY: help init check-host-workspace up-superset up-airflow up-all down logs ps reset-volumes reset-all \
 	etl-bootstrap etl-dry-run etl-backfill-2020-2025 etl-backfill-2020-today warehouse-status warehouse-status-json \
-	devcontainer-join-course-network dbt-debug dbt-seed dbt-run dbt-test dbt-build \
+	devcontainer-join-course-network devcontainer-leave-course-network dbt-debug dbt-seed dbt-run dbt-test dbt-build \
 	airflow-list-dags airflow-list-runs airflow-trigger-incremental airflow-trigger-backfill \
 	airflow-unpause-dags airflow-pause-dags
 
@@ -29,7 +29,7 @@ help:
 	@echo "  make up-superset    Start Superset stack (profile: superset)"
 	@echo "  make up-airflow     Start Airflow stack (profile: airflow)"
 	@echo "  make up-all         Start Superset + Airflow"
-	@echo "  make down           Stop and remove containers"
+	@echo "  make down           Stop/remove containers and detach devcontainer from course network if needed"
 	@echo "  make ps             Show container status"
 	@echo "  make logs SERVICE=<name>  Follow logs for one service"
 	@echo "  make reset-volumes  Remove containers and named volumes"
@@ -54,6 +54,7 @@ help:
 	@echo "  make airflow-trigger-incremental        Trigger airviro_incremental DAG"
 	@echo "  make airflow-trigger-backfill BACKFILL_START=YYYY-MM-DD [BACKFILL_END=YYYY-MM-DD] [BACKFILL_CHUNK_DAYS=31] [BACKFILL_SOURCE_KEYS=air_quality_station_19] [BACKFILL_ADVANCE_WATERMARK=true]"
 	@echo "  make devcontainer-join-course-network  Attach devcontainer to compose network"
+	@echo "  make devcontainer-leave-course-network Detach devcontainer from compose network"
 
 init:
 	@if [ ! -f "$(ENV_FILE)" ]; then cp .env.example "$(ENV_FILE)"; echo "Created $(ENV_FILE) from .env.example"; fi
@@ -83,6 +84,7 @@ up-all: init check-host-workspace
 	@$(COMPOSE) $(PROFILES_SUPERSET) $(PROFILES_AIRFLOW) up -d
 
 down: check-host-workspace
+	@$(MAKE) --no-print-directory devcontainer-leave-course-network
 	@$(COMPOSE) $(PROFILES_SUPERSET) $(PROFILES_AIRFLOW) down --remove-orphans
 
 ps: check-host-workspace
@@ -93,9 +95,11 @@ logs: check-host-workspace
 	@$(COMPOSE) $(PROFILES_SUPERSET) $(PROFILES_AIRFLOW) logs -f --tail=200 $(SERVICE)
 
 reset-volumes: check-host-workspace
+	@$(MAKE) --no-print-directory devcontainer-leave-course-network
 	@$(COMPOSE) $(PROFILES_SUPERSET) $(PROFILES_AIRFLOW) down -v --remove-orphans
 
 reset-all: check-host-workspace
+	@$(MAKE) --no-print-directory devcontainer-leave-course-network
 	@$(COMPOSE) $(PROFILES_SUPERSET) $(PROFILES_AIRFLOW) down -v --rmi local --remove-orphans
 
 etl-bootstrap: init
@@ -132,6 +136,25 @@ devcontainer-join-course-network: init
 		echo "Devcontainer '$$container_id' is already attached to '$$network_name'."; \
 	else \
 		echo "$$connect_output"; \
+		exit 1; \
+	fi
+
+devcontainer-leave-course-network:
+	@project_name="course"; \
+	if [ -f "$(ENV_FILE)" ]; then \
+		project_name="$$(grep -E '^COMPOSE_PROJECT_NAME=' "$(ENV_FILE)" | cut -d '=' -f2-)"; \
+	fi; \
+	if [ -z "$$project_name" ]; then project_name="course"; fi; \
+	network_name="$${project_name}_default"; \
+	container_id="$$(hostname)"; \
+	if ! sudo docker network inspect "$$network_name" >/dev/null 2>&1; then \
+		echo "Compose network '$$network_name' is not present."; \
+	elif disconnect_output="$$(sudo docker network disconnect "$$network_name" "$$container_id" 2>&1)"; then \
+		echo "Disconnected devcontainer '$$container_id' from '$$network_name'."; \
+	elif echo "$$disconnect_output" | grep -qi 'not connected'; then \
+		echo "Devcontainer '$$container_id' is not attached to '$$network_name'."; \
+	else \
+		echo "$$disconnect_output"; \
 		exit 1; \
 	fi
 
