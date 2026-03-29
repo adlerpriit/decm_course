@@ -81,6 +81,9 @@ Lecture 4 warehouse relations:
 Superset SQL helper snippets:
 - `superset/snippets.md`
 
+Shared source reference:
+- `docs/reference/ohuseire-api.md`
+
 ## 3) Continue With Lecture 5 (Airflow + dbt)
 
 Primary guide:
@@ -93,13 +96,29 @@ Core commands:
 
 ```bash
 make up-airflow
+make etl-bootstrap-l5
 make dbt-build
 make airflow-unpause-dags
 make airflow-trigger-incremental
 ```
 
-Note: the Lecture 5 warehouse/dbt refactor is planned separately.
-Lecture 4 now uses the lecture-specific `l4_*` schemas.
+Lecture 5 uses separate schemas so students can compare the raw ETL design from Lecture 4 with the dimensional warehouse design from Lecture 5:
+- `l5_raw.ohuseire_measurement`
+- `l5_raw.pipeline_watermark`
+- `l5_mart.dim_station`
+- `l5_mart.dim_date`
+- `l5_mart.dim_time_hour`
+- `l5_mart.fct_air_quality_hourly`
+- `l5_mart.fct_pollen_daily`
+- `l5_mart.v_air_quality_hourly`
+- `l5_mart.v_pollen_daily`
+- `l5_mart.v_ohuseire_measurements_long`
+
+Current teaching-stack note:
+- Airflow and Superset are both built locally from slim Debian images with pinned `uv` lock files.
+- Airflow and dbt share one custom image for low-friction local use.
+- dbt is installed into its own `/opt/dbt-venv` inside that image so its Python dependencies stay isolated from Airflow.
+- The shared database now defaults to `pgduckdb`, which keeps PostgreSQL compatibility while allowing optional DuckDB file queries from the same warehouse.
 
 Open Airflow:
 - URL: <http://localhost:8080>
@@ -144,6 +163,7 @@ These lifecycle targets detach the devcontainer from the course Compose network 
 - Prefer the `make up-*` targets over raw `docker compose up` inside the devcontainer.
 - Docker runs through the mounted host socket, so the Makefile resolves bind mount paths against the host daemon.
 - Run `make print-host-workspace` to inspect the requested and resolved workspace paths when debugging bind mounts.
+- `warehouse/files/` is bind-mounted into the database and Airflow containers for optional DuckDB file access experiments.
 
 ## Lecture Index
 

@@ -149,6 +149,13 @@ Even in this simple script, there are a few good habits worth noticing:
    - in the simple script we hard-code one known source;
    - in the advanced ETL we later add metadata discovery, retries, audits, and multiple source types.
 
+## Ohuseire API Quick Reference
+
+Shared reference:
+- [Ohuseire API Reference](../../reference/ohuseire-api.md)
+
+That shared page explains the endpoint patterns, example URLs, and a few quirks observed in the live public API, including duplicate-looking indicator ids and why manual `indicators=` overrides need extra care.
+
 ## Part 2: Advanced CLI ETL
 
 After the simple script, we move to the repository's more advanced Airviro ETL.

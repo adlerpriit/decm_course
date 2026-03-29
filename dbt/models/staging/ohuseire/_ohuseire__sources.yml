@@ -1,12 +1,12 @@
 version: 2
 
 sources:
-  - name: raw
-    description: Raw Airviro measurements loaded by the Python ETL.
-    schema: raw
+  - name: ohuseire_raw
+    description: Long-form raw Ohuseire measurements loaded by the Python ETL into the Lecture 5 raw schema.
+    schema: "{{ env_var('DBT_SOURCE_RAW_SCHEMA', 'l5_raw') }}"
     tables:
-      - name: airviro_measurement
-        description: Long-form measurements keyed by source, station, timestamp, and indicator.
+      - name: ohuseire_measurement
+        description: One row per measurement keyed by source, station, timestamp, and indicator.
         columns:
           - name: source_type
             tests:
@@ -23,4 +23,3 @@ sources:
           - name: source_row_hash
             tests:
               - not_null
-

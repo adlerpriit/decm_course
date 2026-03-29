@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: int_air_quality_measurement
+    description: Air-quality measurements enriched with date keys and a 24-slot teaching hour surrogate.
+    columns:
+      - name: station_key
+        tests:
+          - not_null
+      - name: indicator_key
+        tests:
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+      - name: hour_key
+        description: Zero-based hour slot within a station and indicator day profile.
+        tests:
+          - not_null
+
+  - name: int_air_quality_hourly_wide
+    description: Convenience pivot used to build the student-facing hourly presentation view.
+    columns:
+      - name: station_key
+        tests:
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+      - name: hour_key
+        tests:
+          - not_null
+
+  - name: int_pollen_daily
+    description: Daily pollen measurements rolled to one row per station, day, and indicator.
+    columns:
+      - name: station_key
+        tests:
+          - not_null
+      - name: indicator_key
+        tests:
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
