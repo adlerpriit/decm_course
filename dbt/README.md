@@ -1,10 +1,10 @@
 # Ohuseire dbt Project
 
-This project contains the SQL-first transformation layer for the Lecture 5 warehouse.
+This project contains the Structured Query Language (SQL)-first transformation layer for the Lecture 5 warehouse. dbt stands for data build tool.
 
 Lecture 4 and Lecture 5 use different warehouse schemas:
 
-- Lecture 4 focuses on ETL foundations in `l4_*`
+- Lecture 4 focuses on extract-transform-load (ETL) foundations in `l4_*`
 - Lecture 5 focuses on orchestration and dimensional modeling in `l5_raw` and `l5_mart`
 
 This dbt project is the Lecture 5 transformation layer.
@@ -15,11 +15,32 @@ In Lecture 5, dbt is the step between "raw data loaded successfully" and "we can
 
 Flow:
 
-1. Python ETL loads source-shaped rows into `l5_raw`
+1. Python ETL loads raw rows that still look close to the source structure into `l5_raw`
 2. dbt standardizes those rows in staging models
 3. dbt prepares reusable logic in intermediate models
 4. dbt builds dimensions, facts, and presentation views in `l5_mart`
-5. dbt tests help confirm that the modeled warehouse still matches the intended grain and relationships
+5. dbt tests help confirm that the modeled warehouse still matches the intended grain and key relationships
+
+## Key Terms
+
+- Staging:
+  The first cleanup layer over raw source tables.
+- Intermediate:
+  Small reusable transformation steps between staging and final models.
+- Mart:
+  The cleaned, analysis-ready part of the warehouse.
+- Model:
+  In dbt, a SQL file that builds a table or a view.
+- Dimension:
+  A descriptive lookup table, such as stations, dates, or indicators.
+- Fact:
+  A table that stores measurements or events at a clearly defined grain.
+- Grain:
+  What one row represents.
+- Seed:
+  A small comma-separated values (CSV) file that dbt loads into the warehouse.
+- Daylight saving time (DST):
+  The spring and autumn clock change that can create skipped or repeated local hours.
 
 ## Run from this repository
 
@@ -38,12 +59,14 @@ make dbt-docs-serve
 2. `dbt run`
 3. `dbt test`
 
-All commands run inside the `airflow-scheduler` container using the same dependencies as Airflow DAG tasks.
+Here, `dbt seed` loads small CSV tables from `dbt/seeds/` into the warehouse.
+
+All commands run inside the `airflow-scheduler` container using the same dependencies as the dbt steps that Airflow runs in its workflows.
 
 `make dbt-docs` runs `dbt docs generate` and writes documentation artifacts into `dbt/target/`.
 Those generated files are intentionally ignored by git.
 
-`make dbt-docs-serve` regenerates the docs and starts a small optional `dbt-docs` Compose service that runs `dbt docs serve` on `http://127.0.0.1:8081`.
+`make dbt-docs-serve` regenerates the docs and starts a small optional `dbt-docs` Docker Compose service that runs `dbt docs serve` on `http://127.0.0.1:8081`.
 That service reuses the same Airflow+dbt image, but it stays separate from the Airflow API server so each container keeps one clear job.
 
 Do not open `dbt/target/index.html` directly with `file://`.
@@ -70,24 +93,24 @@ That means:
 This project follows the layered layout recommended in the official dbt structure guides, adapted to the course repository.
 
 - `models/staging/ohuseire/`
-  Source-conformed views over `l5_raw.ohuseire_measurement`.
+  Cleanup views directly over `l5_raw.ohuseire_measurement`.
 - `models/intermediate/ohuseire/`
   Small transformation steps that prepare data for facts and presentation models.
 - `models/marts/dimensions/`
-  Conformed dimensions used across facts and views.
+  Shared dimensions used across facts and views.
 - `models/marts/facts/`
-  Long-form fact tables with explicit grains.
+  Long-form fact tables with clear row-level meaning.
 - `models/marts/presentation/`
-  Analysis-friendly and Superset-friendly reporting views built on the facts and dimensions.
+  Analysis-friendly reporting views built on the facts and dimensions, including views that work well in Superset.
 
 ## Read The Models In This Order
 
 If we are reading the dbt project for the first time, this order works well:
 
 1. `models/staging/ohuseire/stg_ohuseire_measurement.sql`
-   See how raw rows are normalized into one stable source contract with local clock fields.
+   See how raw rows are normalized into one stable staging view with clear local time fields.
 2. `models/intermediate/ohuseire/int_air_quality_measurement.sql`
-   See how local clock hours, repeated-hour occurrences, and DST expectations are prepared.
+   See how local clock hours, repeated-hour occurrences, and daylight saving time (DST) expectations are prepared.
 3. `models/intermediate/ohuseire/int_pollen_daily.sql`
    Compare the daily pollen path with the hourly air-quality path.
 4. `models/marts/dimensions/`
@@ -100,9 +123,9 @@ If we are reading the dbt project for the first time, this order works well:
 ## Key Models
 
 - `stg_ohuseire_measurement`
-  Canonical staging view over the raw table.
+  Stable staging view over the raw table.
 - `int_air_quality_measurement`
-  Adds the true local `hour_key`, repeated-hour occurrence, and DST-aware completeness fields.
+  Adds the true local `hour_key`, repeated-hour occurrence, and daylight saving time (DST)-aware completeness fields.
 - `fct_air_quality_hourly`
   Long-form hourly fact at the grain `station x date x clock hour x hour occurrence x indicator`.
 - `fct_pollen_daily`
@@ -123,10 +146,10 @@ If we are reading the dbt project for the first time, this order works well:
 
 ## Modeling Notes
 
-- Raw ingestion stays long-form so ETL window stitching can deduplicate overlapping fetch windows instead of depending on indicator-array index alignment.
+- Raw ingestion stays long-form so overlapping ETL windows can be stitched back together without depending on indicator-array index alignment.
 - Each top-level ETL window is fetched with a small date overlap and trimmed back to the requested window so historical backfills do not lose boundary rows.
 - Presentation views sit on top of facts instead of replacing them.
-- The raw source timestamp is stored as local Ohuseire time. The warehouse keeps that local timestamp, the true local `hour_key`, and a repeated-hour occurrence counter so DST days stay explainable without pretending the source gave us UTC instants.
+- The raw source timestamp is stored as local Ohuseire time. The warehouse keeps that local timestamp, the true local `hour_key`, and a repeated-hour occurrence counter so daylight saving time (DST) days stay explainable without pretending the source gave us Coordinated Universal Time (UTC) instants.
 - The project is split into small models so we can read and test one step at a time instead of reverse-engineering one large SQL file.
 
 ## Validation

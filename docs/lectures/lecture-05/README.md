@@ -2,22 +2,57 @@
 
 ## Audience and Goal
 
-This lecture builds on Lecture 4. Instead of running ETL by hand, we now work through a complete pipeline flow:
+This lecture builds on Lecture 4. Instead of running ETL (Extract, Transform, Load) by hand, we now work through a complete pipeline flow:
 
-1. read source metadata and measurements from the Ohuseire API
+1. read source metadata and measurements from the Ohuseire API (Application Programming Interface)
 2. load raw data into a warehouse
-3. transform that raw data with dbt
+3. transform that raw data with dbt (data build tool)
 4. orchestrate the full flow with Airflow
 
-Goal: understand how API-driven ETL, dimensional modeling, dbt, and Airflow fit together in one clear local stack.
+Goal: understand how API-driven ETL, dimensional modeling (organizing data into facts and dimensions for analysis), dbt, and Airflow fit together in one clear local stack.
+
+## Key Terms
+
+- ETL:
+  Extract, Transform, Load. Data is transformed before or while it is loaded into the warehouse.
+- ELT:
+  Extract, Load, Transform. Raw data lands first, and transformation happens inside the warehouse later.
+- DAG:
+  Directed Acyclic Graph. In Airflow, a DAG is one workflow made of tasks and dependencies.
+- Schema:
+  A named area inside the database, such as `l5_raw` or `l5_mart`.
+- Warehouse:
+  The database area where we keep both raw data and analysis-ready data.
+- Data mart:
+  The cleaned, analysis-ready part of the warehouse. In this repo, `l5_mart` is the mart schema.
+- Model:
+  In dbt, a SQL file that builds a table or a view.
+- Grain:
+  What one row represents.
+- Idempotent:
+  Safe to rerun. Running the same step again should not create unintended duplicates.
+- Watermark:
+  A stored progress marker that tells the pipeline how far it has already loaded data.
+- Incremental load:
+  A run that loads only the next needed slice of data instead of reloading all history.
+- Backfill:
+  Loading older historical data on purpose.
+- Upsert:
+  Insert a new row or update the matching row if it already exists.
+- Long-form data:
+  One measurement per row, usually with columns such as station, indicator, timestamp, and value.
+- Wide data:
+  A reporting shape where one row contains many measurement columns side by side.
+- Daylight saving time (DST):
+  The clock change in spring and autumn that can create skipped or repeated local hours.
 
 ## ETL Or ELT?
 
 In common data-engineering literature, this Lecture 5 pipeline is best described as an **ELT-style** flow:
 
 - Python extracts data from the Ohuseire API.
-- Python loads raw, source-shaped rows into `l5_raw`.
-- dbt transforms that already-loaded raw data into analytical models in `l5_mart`.
+- Python loads raw rows that still look close to the source structure into `l5_raw`.
+- dbt transforms that already-loaded raw data into analysis-ready tables and views in `l5_mart`.
 - Airflow orchestrates the whole workflow.
 
 You may notice that dbt also materializes tables and views. In strict step-by-step language, that can feel like a second load step. In most references, though, this is still grouped under **ELT** because the important boundary is that transformation happens after raw data has already been loaded into the warehouse.
@@ -75,7 +110,7 @@ Lecture 4 and Lecture 5 use different schemas:
 That separation helps us compare:
 
 - manual ETL versus orchestrated ETL
-- serving views built directly from ETL versus a dbt-modeled warehouse
+- reporting views built directly from ETL versus a dbt-modeled warehouse
 - a simpler operational setup versus a more structured pipeline
 
 ## ETL Stages In This Repository
@@ -88,6 +123,8 @@ The ETL starts by reading metadata from the source API:
 - station indicator lists
 - indicator names, formulas, and units
 
+Here, metadata means descriptive information about the stations and indicators, not the measurements themselves.
+
 Shared source reference:
 - [Ohuseire API Reference](../../reference/ohuseire-api.md)
 
@@ -99,7 +136,7 @@ Important behaviors:
 
 - explicit request windows instead of unbounded fetches
 - retries for transient failures
-- split-on-failure logic for large windows
+- if a large date window fails, the ETL retries with smaller windows
 - one-day overlap on both sides of each logical window
 
 That overlap is important because the source API can behave strangely around historical window edges.
@@ -113,13 +150,13 @@ Raw grain:
 
 The load is idempotent:
 - rerunning the same logical window should not create duplicate raw measurements
-- audit rows describe what was fetched and loaded
+- ingestion audit rows describe what was fetched and loaded
 
 ### 4. Transform With dbt
 
 dbt then turns raw rows into a small dimensional warehouse:
 
-- staging models standardize raw contracts
+- staging models standardize the raw column set and meanings
 - intermediate models prepare reusable logic
 - marts build dimensions, facts, and presentation views
 
@@ -127,7 +164,7 @@ dbt then turns raw rows into a small dimensional warehouse:
 
 Airflow ties the steps together:
 
-- bootstrap and prerequisite checks
+- setup and readiness checks
 - incremental planning from watermarks
 - ETL execution
 - `dbt seed`, `dbt run`, `dbt test`
@@ -138,21 +175,21 @@ Airflow ties the steps together:
 - Idempotency:
   ETL windows can be rerun safely because raw rows are keyed and upserted instead of blindly appended.
 - Separate raw and mart schemas:
-  `l5_raw` preserves source-shaped data; `l5_mart` contains curated analytical models.
+  `l5_raw` preserves data that still looks close to the source; `l5_mart` contains curated analytical models.
 - Long-form raw storage:
   adding new indicators is easier when raw data stays long-form.
 - Watermark-based incremental design:
-  Airflow tracks per-source progress without depending on scheduler catchup.
+  Airflow tracks per-source progress without needing one scheduled run for every missed time interval.
 - Overlap and trim window stitching:
   the ETL trusts each measurement timestamp and uses overlap to recover boundary rows.
 - dbt layering:
   small models are easier to reason about than one large transformation query.
 - Tests close to transformations:
-  `dbt test` makes the modeling layer observable, not just "built".
+  `dbt test` helps us check that the modeled warehouse still matches the design we intended.
 - Lightweight DAG files:
-  top-level DAG code stays small while shared logic lives in helper modules.
+  the main DAG files stay small while shared logic lives in helper modules.
 - Honest time modeling:
-  the source gives local timestamps, so the warehouse models local clock hour and repeated-hour occurrence explicitly instead of inventing UTC precision.
+  the source gives local timestamps, so the warehouse models local clock hour and repeated-hour occurrence explicitly instead of inventing Coordinated Universal Time (UTC) precision.
 
 ## Read The Code In This Order
 
@@ -221,7 +258,7 @@ Backfill example:
 make airflow-trigger-backfill BACKFILL_START=2020-01-01 BACKFILL_END=2020-12-31 BACKFILL_CHUNK_DAYS=31 BACKFILL_SOURCE_KEYS=air_quality_station_4,air_quality_station_8,pollen_station_25
 ```
 
-Open Airflow UI:
+Open the Airflow web interface:
 - <http://localhost:8080>
 - user: `airflow`
 - pass: `airflow`
@@ -259,7 +296,7 @@ This local stack stays small:
 
 - local Docker Compose instead of a production deployment platform
 - Airflow and dbt inside one local image
-- LocalExecutor instead of Celery or Kubernetes
+- one local Airflow task runner instead of a distributed worker setup
 - one shared PostgreSQL-compatible service instead of multiple platform components
 
 This keeps the lecture focused on data flow and design patterns instead of platform complexity. Other deployments may split these services further.
@@ -272,5 +309,3 @@ Use these follow-up materials:
   [operations.md](./operations.md)
 - dbt structure and model notes:
   [dbt README](../../../dbt/README.md)
-
-If you reused an older local database volume and the stack behaves strangely after switching database images, use the recovery notes in [operations.md](./operations.md).

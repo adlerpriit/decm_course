@@ -1,6 +1,6 @@
 # Ohuseire API Reference
 
-This document collects the public Ohuseire source API details used across the repository.
+This document collects the public Ohuseire source API details used across the repository. API stands for Application Programming Interface.
 
 Base URL:
 - `https://www.ohuseire.ee/api`
@@ -19,7 +19,7 @@ Example:
 - `https://www.ohuseire.ee/api/station/en`
 
 Response shape:
-- GeoJSON-like object with top-level `type` and `features[]`
+- a JSON (JavaScript Object Notation) object with top-level `type` and `features[]`, similar to map-style data formats
 
 Useful fields:
 - `id`
@@ -38,7 +38,7 @@ Examples:
 - `https://www.ohuseire.ee/api/indicator/en?type=POLLEN`
 
 Response shape:
-- JSON list
+- JSON (JavaScript Object Notation) list
 
 Useful fields:
 - `id`
@@ -63,7 +63,7 @@ Example:
 - `https://www.ohuseire.ee/api/monitoring/en?stations=8&type=INDICATOR&range=10.03.2026,12.03.2026&indicators=66`
 
 Response shape:
-- JSON list
+- JSON (JavaScript Object Notation) list
 
 Useful fields:
 - `measured`
@@ -86,7 +86,7 @@ These checks were verified against the live public API on March 28, 2026.
 - `https://www.ohuseire.ee/api`
 - `https://www.ohuseire.ee/api/`
 
-Both returned `404` in live checks, and no public OpenAPI, Swagger, or separate API manual page was found. In practice, the metadata endpoints are the live documentation.
+Both returned `404 Not Found` in live checks, and no public machine-readable API specification such as OpenAPI or Swagger was found. In practice, the metadata endpoints are the live documentation.
 
 ### Station 19 Is Not In The Published Station Catalog
 
@@ -96,7 +96,7 @@ Direct requests such as:
 - `.../monitoring/en?stations=19&type=INDICATOR&range=10.03.2026,12.03.2026`
 - `.../monitoring/en?stations=19&type=POLLEN&range=10.03.2026,12.03.2026`
 
-returned `HTTP 500`, not station `19` data. Based on that evidence, station `19` should be treated as unsupported or invalid rather than "present but missing from metadata".
+returned a server error (`HTTP 500`), not station `19` data. Based on that evidence, station `19` should be treated as unsupported or invalid rather than "present but missing from metadata".
 
 ### Manual Indicator Filtering Works, But Has Sharp Edges
 
@@ -116,7 +116,7 @@ Examples observed on March 28, 2026:
 - `stations=8&indicators=34` returned `864` rows for `12` other stations with indicator `34`
 - `stations=999&indicators=66` returned station `8` temperature-at-10m rows
 - `stations=19&indicators=66` also returned station `8` rows
-- `stations=8&indicators=33` returned `HTTP 500`
+- `stations=8&indicators=33` returned a server error (`HTTP 500`)
 
 Recommendation:
 - only use manual `indicators=` overrides after validating the station-indicator combination against `station/<locale>`
@@ -140,9 +140,9 @@ Not all duplicate ids appear to be live in current monitoring data.
 
 Examples from March 10-12, 2026:
 - `31` returned live humidity rows for station `38`
-- `32` returned `HTTP 500`
+- `32` returned a server error (`HTTP 500`)
 - `34` returned live temperature rows for multiple stations
-- `33` returned `HTTP 500`
+- `33` returned a server error (`HTTP 500`)
 - `66` returned live rows only for station `8`
 
 ### Station 8 Temperature Really Uses Indicator 66 In Current Metadata
@@ -156,7 +156,7 @@ In the same live tests:
 
 So for the current public API, station `8` should still be treated as a `66` station for temperature-like data, even though most other stations use `34`.
 
-## Teaching/ETL Guidance
+## Practical Repository Guidance
 
 - Trust the station catalog first.
 - Treat `indicators=` as an advanced probe, not a default extraction path.
